@@ -1,0 +1,19 @@
+[package]
+name = "lms-grader"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/situkangsayur/lms-grader"
+authors = ["Hendri Karisma"]
+description = "Auto-grading assistant for the hendrikarisma.my.id LMS: pulls quizzes and assignments, proposes marks with Ollama, flags AI-likely text. Marks are proposals; the lecturer releases them."
+
+[dependencies]
+anyhow = "1"
+axum = "0.8"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "process", "fs"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite", "macros"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
