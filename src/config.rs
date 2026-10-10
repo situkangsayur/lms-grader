@@ -12,6 +12,8 @@ pub struct Config {
     pub db_path: String,
     pub bind: String,
     pub python: String,
+    /// Required when `bind` is not loopback: HTTP Basic password for user "dosen".
+    pub dash_password: String,
 }
 
 impl Config {
@@ -26,8 +28,9 @@ impl Config {
             embed_model: get("EMBED_MODEL", "bge-m3"),
             db_path: get("GRADER_DB", "data/grader.db"),
             // Loopback only: the dashboard shows student work and is not meant for the network.
-            bind: get("GRADER_BIND", "127.0.0.1:8420"),
+            bind: get("GRADER_BIND", "127.0.0.1:8431"),
             python: get("GRADER_PYTHON", "python/.venv/bin/python"),
+            dash_password: get("GRADER_DASH_PASSWORD", ""),
         })
     }
 }

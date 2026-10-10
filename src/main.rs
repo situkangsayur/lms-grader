@@ -17,6 +17,7 @@ mod config;
 mod lms;
 mod ollama;
 mod store;
+mod web;
 
 use anyhow::Result;
 
@@ -38,7 +39,7 @@ async fn main() -> Result<()> {
             let n = grade_pending(&cfg, &db, limit).await?;
             println!("{n} usulan nilai dibuat (belum dikirim ke LMS — tinjau dulu di dashboard)");
         }
-        Some("serve") => serve(&cfg, db).await?,
+        Some("serve") => web::serve(&cfg, db).await?,
         Some("check") => {
             let ok = ollama::Client::new(&cfg).ping().await;
             println!("ollama {}: {}", cfg.ollama_url, if ok { "ok" } else { "TIDAK TERJANGKAU" });
@@ -64,30 +65,4 @@ async fn grade_pending(cfg: &config::Config, db: &sqlx::SqlitePool, limit: i64) 
         made += 1;
     }
     Ok(made)
-}
-
-/// Review dashboard — initial skeleton: lists proposals. Accept/edit/write-back come next (README, phase 3).
-async fn serve(cfg: &config::Config, db: sqlx::SqlitePool) -> Result<()> {
-    use axum::{extract::State, response::Html, routing::get, Router};
-    async fn index(State(db): State<sqlx::SqlitePool>) -> Html<String> {
-        let rows = store::proposals(&db).await.unwrap_or_default();
-        let body: String = rows.iter().map(|p| format!(
-            "<tr><td>{}</td><td>{}</td><td>{:.1}</td><td>{:.0}%</td><td>{}</td></tr>",
-            html(&p.title), html(&p.student), p.mark, p.ai_likelihood * 100.0, html(&p.status),
-        )).collect();
-        Html(format!(
-            "<!doctype html><meta charset=utf-8><title>LMS grader</title>\
-             <h1>Usulan nilai</h1><p>Usulan belum dikirim ke LMS. Skor AI hanya tanda, tidak memotong nilai.</p>\
-             <table border=1 cellpadding=4><tr><th>Item</th><th>Mahasiswa</th><th>Usulan</th><th>AI?</th><th>Status</th></tr>{body}</table>"
-        ))
-    }
-    let app = Router::new().route("/", get(index)).with_state(db);
-    let listener = tokio::net::TcpListener::bind(&cfg.bind).await?;
-    println!("dashboard: http://{}", cfg.bind);
-    axum::serve(listener, app).await?;
-    Ok(())
-}
-
-fn html(s: &str) -> String {
-    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
 }

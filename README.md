@@ -21,7 +21,7 @@ LMS /api/v1 ──sync──▶ Rust (lms-grader) ──▶ SQLite lokal data/gr
                          ├─ analyzer.py (Python, stdin/stdout JSON)
                          │     ekstraksi teks · URL/DOI · embedding bge-m3 · [ONNX AI-detector]
                          └─ Ollama qwen3:8b ── usulan nilai 0–100 + alasan (JSON)
-dashboard 127.0.0.1:8420 ── dosen meninjau → [fase 3] kirim nilai yang disetujui ke LMS
+dashboard (web) ── dosen meninjau, setujui/ubah nilai → [fase 3] kirim nilai yang disetujui ke LMS
 ```
 
 Rust: alur kerja, API, penyimpanan, dashboard. Python: hanya yang pustakanya jauh lebih baik di Python
@@ -37,7 +37,7 @@ cargo build --release
 ./target/release/lms-grader check     # ollama, analyzer, token
 ./target/release/lms-grader sync      # tarik kuis + tugas
 ./target/release/lms-grader grade 20  # buat usulan untuk 20 item
-./target/release/lms-grader serve     # http://127.0.0.1:8420 (loopback saja — berisi karya mahasiswa)
+./target/release/lms-grader serve     # dashboard: http://127.0.0.1:8431 (default loopback)
 ```
 
 Uji 10 Okt 2026 dengan satu jawaban esai contoh (bukan data mahasiswa): ±11 detik per item di GPU 8 GB; relevansi 0,685;
@@ -47,7 +47,8 @@ sumber (RFC 9293) terdeteksi; usulan nilai + alasan berbahasa Indonesia.
 
 | Fase | Isi | Status |
 |---|---|---|
-| 1 | Kerangka Rust + analyzer Python, sync via API, usulan nilai esai/teks dengan qwen3:8b, relevansi bge-m3, ekstraksi sumber, dashboard daftar usulan | **selesai (inisiasi)** |
+| 1 | Kerangka Rust + analyzer Python, sync via API, usulan nilai esai/teks dengan qwen3:8b, relevansi bge-m3, ekstraksi sumber | **selesai (inisiasi)** |
+| 1b | Dashboard web: ringkasan, daftar dengan filter, detail per item (karya, kesesuaian, tanda AI, sumber, alasan), setujui/ubah nilai + catatan (lokal) | **selesai** |
 | 2 | Baca **berkas** kiriman (PDF/DOCX/ipynb/md/zip), teks slide per pertemuan untuk **kesesuaian materi**, **detektor AI** ONNX (model VAR), rubrik per tugas dari deskripsi "Yang dikumpulkan/Penilaian", poin per soal esai, NIM mahasiswa | rencana |
 | 3 | Dashboard tinjau: setujui/ubah per item atau per tugas, lalu **kirim** nilai + umpan balik lewat `POST /api/v1/submissions/{id}/grade` dan `/attempts/{id}/grade`; jalan terjadwal (systemd timer) | rencana |
 | 4 | Kalibrasi: bandingkan usulan dengan nilai dosen pada sampel, laporan bias, ambang tanda AI | rencana |
@@ -63,6 +64,27 @@ sumber (RFC 9293) terdeteksi; usulan nilai + alasan berbahasa Indonesia.
 - Model 8B bisa salah menilai; karena itu semua nilai melewati dosen.
 - Detektor AI (fase 2) sering keliru pada tulisan Bahasa Indonesia dan pada mahasiswa yang menulis rapi — hanya tanda.
 - Kuis pilihan ganda sudah dinilai otomatis oleh LMS; grader hanya menangani esai dan tugas.
+
+## Dashboard
+
+`lms-grader serve` menyajikan dashboard HTML (tanpa framework JS): **Ringkasan** (jumlah item, usulan menunggu,
+tanda AI), **Usulan** (filter status/mata kuliah), dan **detail** per item. Keputusan dosen disimpan lokal
+(`final_mark`, `note`, status `accepted`); pengiriman ke LMS adalah fase 3.
+
+Akses jaringan: secara default hanya `127.0.0.1`. Untuk membukanya lewat jaringan privat (mis. WireGuard), isi
+`GRADER_BIND` dengan alamat itu **dan** `GRADER_DASH_PASSWORD` — tanpa password, program menolak berjalan di alamat
+non-loopback. Login memakai HTTP Basic, user `dosen`. Batasi juga di firewall hanya ke perangkat dosen.
+
+Contoh service systemd (user):
+
+```ini
+[Service]
+WorkingDirectory=%h/lms-grader
+ExecStart=%h/lms-grader/target/release/lms-grader serve
+Restart=on-failure
+[Install]
+WantedBy=default.target
+```
 
 ## Keamanan dan privasi
 
